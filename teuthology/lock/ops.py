@@ -50,7 +50,7 @@ def update_nodes(nodes, reset_os=False):
             except Exception:
                 pass
         remote = teuthology.orchestra.remote.Remote(
-            canonicalize_hostname(node, user=username) if username else canonicalize_hostname(node))
+            canonicalize_hostname(node))
         if reset_os:
             log.info("Updating [%s]: reset os type and version on server", node)
             inventory_info = dict()
@@ -238,9 +238,11 @@ def unlock_one_safe(name: str, owner: str, run_name: str = "", job_id: str = "")
     maybe_job = query.node_active_job(name, node_status)
     if not maybe_job:
         return unlock_one(name, owner, node_status["description"], node_status)
+    # If the active job matches the current run/job_id, allow unlock (same job cleaning up)
     if run_name and job_id and maybe_job.endswith(f"{run_name}/{job_id}"):
-            log.error(f"Refusing to unlock {name} since it has an active job: {run_name}/{job_id}")
-            return False
+        log.info(f"Allowing unlock of {name} by same job: {run_name}/{job_id}")
+        return unlock_one(name, owner, node_status["description"], node_status)
+    # If there's a different active job, refuse to unlock
     log.warning(f"Refusing to unlock {name} since it has an active job: {maybe_job}")
     return False
 
