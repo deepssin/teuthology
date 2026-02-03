@@ -7,6 +7,7 @@ import os
 import random
 import sys
 import time
+from distutils.util import strtobool
 
 import teuthology
 from teuthology.config import config, YamlConfig
@@ -15,7 +16,6 @@ from teuthology.results import UNFINISHED_STATUSES
 
 from teuthology.suite.run import Run
 from teuthology.suite.util import schedule_fail
-from teuthology.util.strtobool import strtobool
 
 log = logging.getLogger(__name__)
 

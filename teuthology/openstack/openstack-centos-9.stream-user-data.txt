@@ -12,5 +12,7 @@ packages:
  - python3
  - wget
  - git
- - ntp
+ - chrony
+ - redhat-lsb-core
 final_message: "{up}, after $UPTIME seconds"
+

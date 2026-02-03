@@ -12,8 +12,6 @@ RUN apt-get update && \
     ipmitool \
     pipx \
     vim \
-    jq \
-    curl \
     libev-dev \
     libvirt-dev \
     libffi-dev \
@@ -32,7 +30,7 @@ RUN \
     ./bootstrap
 COPY . /teuthology
 RUN \
-    (git config -f ./.git/config --unset 'http.https://github.com/.extraheader' || true ) && \
+    git config -f ./.git/config --unset 'http.https://github.com/.extraheader' && \
     ./bootstrap
 COPY containers/teuthology-dev/containerized_node.yaml /teuthology
 COPY containers/teuthology-dev/.teuthology.yaml /root

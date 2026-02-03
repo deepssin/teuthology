@@ -172,11 +172,12 @@ def add_remotes(ctx, config):
 
 def connect(ctx, config):
     """
-    Connect to all remotes in ctx.cluster
+    Connect to all remotes in ctx.cluster using config from kwargs.
     """
     log.info('Opening connections...')
     for rem in ctx.cluster.remotes.keys():
         log.debug('connecting to %s', rem.name)
+        log.debug('Connection config: %s', config)
         rem.connect()
 
 

@@ -155,21 +155,20 @@ class TeuthologyConfig(YamlConfig):
         'ceph_git_url': None,
         'ceph_qa_suite_git_url': None,
         'ceph_cm_ansible_git_url': None,
-        'teuthology_git_url': None,
         'use_conserver': False,
         'conserver_master': 'conserver.front.sepia.ceph.com',
         'conserver_port': 3109,
         'gitbuilder_host': 'gitbuilder.ceph.com',
-        'githelper_base_url': 'https://githelper.ceph.com',
+        'githelper_base_url': 'http://githelper.ceph.com',
         'check_package_signatures': True,
         'job_threshold': 500,
         'lab_domain': 'front.sepia.ceph.com',
-        'lock_server': 'https://paddles.front.sepia.ceph.com/',
+        'lock_server': 'http://paddles.front.sepia.ceph.com/',
         'max_job_age': 1209600,  # 2 weeks
         'max_job_time': 259200,  # 3 days
-        'nsupdate_url': 'https://nsupdate.front.sepia.ceph.com/update',
-        'results_server': 'https://paddles.front.sepia.ceph.com/',
-        'results_ui_server': 'https://pulpito.ceph.com/',
+        'nsupdate_url': 'http://nsupdate.front.sepia.ceph.com/update',
+        'results_server': 'http://paddles.front.sepia.ceph.com/',
+        'results_ui_server': 'http://pulpito.ceph.com/',
         'results_sending_email': 'teuthology',
         'results_timeout': 43200,
         'src_base_path': os.path.expanduser('~/src'),
@@ -177,8 +176,8 @@ class TeuthologyConfig(YamlConfig):
         'watchdog_interval': 120,
         'fog_reimage_timeout': 1800,
         'fog_wait_for_ssh_timeout': 600,
-        'kojihub_url': 'https://koji.fedoraproject.org/kojihub',
-        'kojiroot_url': 'https://kojipkgs.fedoraproject.org/packages',
+        'kojihub_url': 'http://koji.fedoraproject.org/kojihub',
+        'kojiroot_url': 'http://kojipkgs.fedoraproject.org/packages',
         'koji_task_url': 'https://kojipkgs.fedoraproject.org/work/',
         'baseurl_template': 'http://{host}/{proj}-{pkg_type}-{dist}-{arch}-{flavor}/{uri}',
         'use_shaman': True,
@@ -187,7 +186,7 @@ class TeuthologyConfig(YamlConfig):
         'suite_verify_ceph_hash': True,
         'suite_allow_missing_packages': False,
         'openstack': {
-            'clone': 'git clone https://github.com/ceph/teuthology',
+            'clone': 'git clone http://github.com/ceph/teuthology',
             'user-data': 'teuthology/openstack/openstack-{os_type}-{os_version}-user-data.txt',
             'ip': '1.1.1.1',
             'machine': {
@@ -220,10 +219,6 @@ class TeuthologyConfig(YamlConfig):
     def get_ceph_git_url(self):
         return (self.ceph_git_url or
                 self.ceph_git_base_url + 'ceph-ci.git')
-
-    def get_teuthology_git_url(self):
-        return (self.teuthology_git_url or
-                self.ceph_git_base_url + 'teuthology.git')
 
 
 class JobConfig(YamlConfig):
@@ -311,5 +306,8 @@ def _get_config_path():
     log.warning(f"no teuthology config found, looked for: {paths}")
     return None
 
+config_path = _get_config_path()
+log.info("config path from teuthology-config.py %s", config_path)
+config = TeuthologyConfig(yaml_path=config_path)
+log.info("TeuthologyConfig(yaml_path=config_path) %s", config)
 
-config = TeuthologyConfig(yaml_path=_get_config_path())

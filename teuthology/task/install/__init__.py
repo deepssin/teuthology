@@ -9,13 +9,14 @@ from teuthology import misc as teuthology
 from teuthology import contextutil, packaging
 from teuthology.parallel import parallel
 from teuthology.task import ansible
+from teuthology.exceptions import ConfigError
 
+from distutils.version import LooseVersion
 from teuthology.task.install.util import (
     _get_builder_project, get_flavor, ship_utilities,
 )
 
 from teuthology.task.install import rpm, deb, redhat
-from teuthology.util.version import LooseVersion
 
 log = logging.getLogger(__name__)
 
@@ -416,22 +417,6 @@ def ceph_deploy_upgrade(ctx, config):
 ceph_deploy_upgrade.__doc__ = docstring_for_upgrade.format(
     cmd_parameter='ceph_deploy_upgrade')
 
-def _override_extra_system_packages(config, project, install_overrides):
-    teuthology.deep_merge(config, install_overrides.get(project, {}))
-    extra_overrides = install_overrides.get('extra_system_packages')
-    if extra_overrides:
-        extra = config.get('extra_system_packages')
-        if extra is None:
-            e = dict(deb=[], rpm=[])
-        elif isinstance(extra, list):
-            e = dict(deb=copy.deepcopy(extra), rpm=copy.deepcopy(extra))
-        elif isinstance(extra, dict):
-            e = copy.deepcopy(extra)
-
-        if isinstance(extra_overrides, list):
-            extra_overrides = dict(deb=extra_overrides, rpm=extra_overrides)
-
-        config['extra_system_packages'] = teuthology.deep_merge(e, extra_overrides)
 
 @contextlib.contextmanager
 def task(ctx, config):
@@ -583,10 +568,22 @@ def task(ctx, config):
     repos = None
 
     if overrides:
-        install_overrides = overrides.get('install', {})
-        log.debug('INSTALL overrides: %s' % install_overrides)
-        _override_extra_system_packages(config, project, install_overrides)
-        repos = install_overrides.get('repos', None)
+        try:
+            install_overrides = overrides.get('install', {})
+            log.debug('INSTALL overrides: %s' % install_overrides)
+            teuthology.deep_merge(config, install_overrides.get(project, {}))
+            overrides_extra_system_packages = install_overrides.get('extra_system_packages')
+            if overrides_extra_system_packages:
+                extra_system_packages = config.get('extra_system_packages')
+                config['extra_system_packages'] = teuthology.deep_merge(extra_system_packages, overrides_extra_system_packages)
+            repos = install_overrides.get('repos', None)
+        except AssertionError:
+            raise ConfigError(
+                "'install' task config and its overrides contain" \
+                "conflicting types for the same config key. Ensure that " \
+                "the configuration is of the same type (dict, list, etc.) " \
+                "in both the task definition and its overrides."
+            )
 
     log.debug('config %s' % config)
 

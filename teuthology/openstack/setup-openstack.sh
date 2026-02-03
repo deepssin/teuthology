@@ -66,12 +66,12 @@ suite_verify_ceph_hash: false
 queue_host: localhost
 lab_domain: $labdomain
 max_job_time: 32400 # 9 hours
-teuthology_path: .
+teuthology_path: ./teuthology
 teuthology_branch: $teuthology_branch
 teuthology_git_url: $teuthology_git_url
 canonical_tags: $canonical_tags
 openstack:
-  clone: git clone http://github.com/ceph/teuthology
+  clone: git clone http://github.com/deepssin/teuthology
   user-data: teuthology/openstack/openstack-{os_type}-{os_version}-user-data.txt
   ip: $ip
   nameserver: $nameserver
@@ -117,25 +117,30 @@ function apt_get_update() {
 }
 
 function setup_docker() {
-    source /etc/os-release
-    if ! $VERSION_CODENAME; then
-        echo "ERROR: VERSION_CODENAME is not set. Cannot proceed with Docker installation."
-        return
-    fi
-    if !command -v docker &> /dev/null; then
+    local codename=$(lsb_release -sc)
+
+    if ! command -v docker &> /dev/null; then
+        echo "Installing Docker for Ubuntu $codename..."
+
+        # Add Docker’s official GPG key
         curl -fsSL https://download.docker.com/linux/ubuntu/gpg | \
             sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+
+        # Set up the stable repository
         echo \
           "deb [arch=amd64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] \
-          https://download.docker.com/linux/ubuntu $VERSION_CODENAME stable" | \
+          https://download.docker.com/linux/ubuntu $codename stable" | \
           sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+
         sudo apt-get update
         sudo apt-get install -y docker-ce docker-ce-cli containerd.io
-        echo "INSTALLED docker"
+
+        echo "✅ Docker installed successfully"
     else
-        echo "OK docker is installed"
+        echo "OK: Docker is already installed"
     fi
 }
+
 
 function setup_fail2ban() {
     if test -f /usr/bin/fail2ban-server; then
@@ -514,22 +519,22 @@ function remove_images() {
 }
 
 function install_packages() {
-    source /etc/os-release
-    if ! $VERSION_CODENAME; then
-        echo "ERROR: VERSION_CODENAME is not set. Cannot proceed with Docker installation."
-        return
-    fi
-    local codename=$VERSION_CODENAME
+    local codename=$(lsb_release -sc)
     local backports_file="/etc/apt/sources.list.d/${codename}-backports.list"
+
+    # Add backports repo only if it doesn't already exist
     if [ ! -f "$backports_file" ]; then
         echo "Adding backports repo for $codename..."
         echo "deb http://archive.ubuntu.com/ubuntu ${codename}-backports main universe" | sudo tee "$backports_file"
         sudo apt-get update
     fi
+
+    # Install required packages
     local packages="jq curl"
     sudo apt-get -qq install -y $packages
-    echo "INSTALL required packages $packages"
+    echo "✅ Installed required packages: $packages"
 }
+  
 
 CAT=${CAT:-cat}
 
@@ -725,7 +730,9 @@ function main() {
         local network_id=$(openstack network list -f json | jq -r ".[] | select(.Name == \"$network\") | .ID")
         local default_subnets=$(openstack subnet list --ip-version 4 -f json \
             | jq -r ".[] | select(.Network == \"$network_id\") | .Subnet" | sort | uniq)
-    }
+        }
+    
+    echo "default_subnets: $default_subnets"
     subnets=$(echo $subnets $default_subnets)
     echo "subnets: $subnets"
 

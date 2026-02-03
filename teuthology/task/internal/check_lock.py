@@ -12,13 +12,14 @@ def check_lock(ctx, config, check_up=True):
     """
     Check lock status of remote machines.
     """
+    log.info(locals())
     if not teuth_config.lock_server or ctx.config.get('check-locks') is False:
         log.info('Lock checking disabled.')
         return
     log.info('Checking locks...')
     for machine in ctx.config['targets'].keys():
         status = teuthology.lock.query.get_status(machine)
-        log.debug('machine status is %s', repr(status))
+        log.debug('machine status for machine %s is %s', machine, repr(status))
         assert status is not None, \
             'could not read lock status for {name}'.format(name=machine)
         if check_up:

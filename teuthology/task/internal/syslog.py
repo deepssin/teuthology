@@ -106,7 +106,7 @@ def syslog(ctx, config):
             log.debug('Checking %s', rem.name)
             stdout = rem.sh(
                 [
-                    'grep', '-E', '--binary-files=text',
+                    'egrep', '--binary-files=text',
                     '\\bBUG\\b|\\bINFO\\b|\\bDEADLOCK\\b',
                     run.Raw(f'{archive_dir}/syslog/kern.log'),
                     run.Raw('|'),
@@ -143,11 +143,11 @@ def syslog(ctx, config):
                     run.Raw('|'),
                     'grep', '-v', 'container-storage-setup: INFO: Volume group backing root filesystem could not be determined',  # noqa
                     run.Raw('|'),
-                    'grep', '-E', '-v', '\\bsalt-master\\b|\\bsalt-minion\\b|\\bsalt-api\\b',
+                    'egrep', '-v', '\\bsalt-master\\b|\\bsalt-minion\\b|\\bsalt-api\\b',
                     run.Raw('|'),
                     'grep', '-v', 'ceph-crash',
                     run.Raw('|'),
-                    'grep', '-E', '-v', '\\btcmu-runner\\b.*\\bINFO\\b',
+                    'egrep', '-v', '\\btcmu-runner\\b.*\\bINFO\\b',
                     run.Raw('|'),
                     'head', '-n', '1',
                 ],
@@ -158,18 +158,6 @@ def syslog(ctx, config):
                 if 'failure_reason' not in ctx.summary:
                     ctx.summary['failure_reason'] = \
                         "'{error}' in syslog".format(error=stdout)
-
-        log.info('Gathering journactl...')
-        run.wait(
-            cluster.run(
-                args=[
-                    'sudo', 'journalctl',
-                    run.Raw('>'),
-                    f'{archive_dir}/syslog/journalctl.log',
-                ],
-                wait=False,
-            )
-        )
 
         log.info('Compressing syslogs...')
         run.wait(
@@ -184,17 +172,25 @@ def syslog(ctx, config):
                     'sudo',
                     'xargs',
                     '-0',
-                    '--max-args=1',
-                    '--max-procs=0',
-                    '--verbose',
                     '--no-run-if-empty',
                     '--',
                     'gzip',
-                    '-5',
-                    '--verbose',
                     '--',
                 ],
                 wait=False,
             )
         )
 
+        log.info('Gathering journactl -b0...')
+        run.wait(
+            cluster.run(
+                args=[
+                    'sudo', 'journalctl', '-b0',
+                    run.Raw('|'),
+                    'gzip', '-9',
+                    run.Raw('>'),
+                    f'{archive_dir}/syslog/journalctl-b0.gz',
+                ],
+                wait=False,
+            )
+        )

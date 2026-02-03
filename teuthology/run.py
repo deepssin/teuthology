@@ -99,6 +99,7 @@ def setup_config(config_paths) -> dict:
     into a single dictionary. Processes / validates the dictionary and then
     returns it.
     """
+    log.info("config_paths %s", config_paths)
     config = merge_configs(config_paths)
 
     # Older versions of teuthology stored job_id as an int. Convert it to a str
@@ -327,7 +328,7 @@ def main(args):
     interactive_on_error = args["--interactive-on-error"]
 
     # print the command being ran
-    log.debug("Teuthology command: {0}".format(get_teuthology_command(args)))
+    log.info("Teuthology command: {0}".format(get_teuthology_command(args)))
 
     if owner is None:
         args["--owner"] = owner = get_user()
@@ -342,13 +343,7 @@ def main(args):
     set_up_logging(verbose, archive)
 
     write_initial_metadata(archive, config, name, description, owner)
-    report.try_push_job_info(
-        config,
-        {
-            'status': 'running',
-            'pid': os.getpid(),
-        },
-    )
+    report.try_push_job_info(config, dict(status='running'))
 
     machine_type = get_machine_type(machine_type, config)
     args["--machine-type"] = machine_type

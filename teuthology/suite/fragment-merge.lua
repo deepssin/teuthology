@@ -16,7 +16,6 @@ local lua_allowlist = {
   py_iterex = python.iterex,
   py_itemgetter = python.as_itemgetter,
   math = math,
-  string = string,
 }
 lua_allowlist.__index = lua_allowlist
 

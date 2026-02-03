@@ -247,7 +247,7 @@ def get_openstack_parser():
     parser.add_argument(
         '--teuthology-git-url',
         help="git clone url for teuthology",
-        default=os.getenv('TEUTH_REPO', 'https://github.com/ceph/teuthology'),
+        default=os.getenv('TEUTH_REPO', 'https://github.com/deepssin/teuthology'),
     )
     parser.add_argument(
         '--teuthology-branch',

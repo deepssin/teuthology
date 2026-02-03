@@ -42,13 +42,6 @@ def main(args):
     except SkipJob:
         return 0
 
-    if not (job_config.get('first_in_suite') or job_config.get('last_in_suite')):
-        report.try_push_job_info({
-            'name': job_config['name'],
-            'job_id': job_config['job_id'],
-            'pid': os.getpid(),
-        })
-
     # reimage target machines before running the job
     if 'targets' in job_config:
         node_count = len(job_config["targets"])
@@ -232,7 +225,7 @@ def reimage(job_config):
     try:
         reimaged = lock_ops.reimage_machines(ctx, targets, job_config['machine_type'])
     except Exception as e:
-        log.exception('Reimaging error. Unlocking machines...')
+        log.exception('Reimaging error. Nuking machines...')
         unlock_targets(job_config)
         # Reimage failures should map to the 'dead' status instead of 'fail'
         report.try_push_job_info(

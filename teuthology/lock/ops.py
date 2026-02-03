@@ -43,15 +43,19 @@ def update_nodes(nodes, reset_os=False):
 
 def lock_many_openstack(ctx, num, machine_type, user=None, description=None,
                         arch=None):
+    log.info("locals from lock_many_openstack {}".format(locals()))
     os_type = teuthology.provision.get_distro(ctx)
     os_version = teuthology.provision.get_distro_version(ctx)
     if hasattr(ctx, 'config'):
         resources_hint = ctx.config.get('openstack')
     else:
         resources_hint = None
+    log.info("create provison: {}, {}, {}, {}, {}".format(
+        num, os_type, os_version, arch, resources_hint))
     machines =  teuthology.provision.openstack.ProvisionOpenStack().create(
         num, os_type, os_version, arch, resources_hint)
     result = {}
+    log.info("machine in machines: {}".format(machines))
     for machine in machines:
         lock_one(machine, user, description)
         result[machine] = None # we do not collect ssh host keys yet
@@ -76,20 +80,18 @@ def lock_many(ctx, num, machine_type, user=None, description=None,
     # all in one shot. If we are passed 'plana,mira,burnupi,vps', do one query
     # for 'plana,mira,burnupi' and one for 'vps'
     machine_types_list = misc.get_multi_machine_types(machine_type)
-    downburst_types = teuthology.provision.downburst.get_types()
-    if all(t in downburst_types for t in machine_types_list):
+    if machine_types_list == ['vps']:
         machine_types = machine_types_list
     elif machine_types_list == ['openstack']:
         return lock_many_openstack(ctx, num, machine_type,
                                    user=user,
                                    description=description,
                                    arch=arch)
-    elif any(t in downburst_types for t in machine_types_list):
-        the_vps = list(t for t in machine_types_list
-                                        if t in downburst_types)
-        non_vps = list(t for t in machine_types_list
-                                        if not t in downburst_types)
-        machine_types = ['|'.join(non_vps), '|'.join(the_vps)]
+    elif 'vps' in machine_types_list:
+        machine_types_non_vps = list(machine_types_list)
+        machine_types_non_vps.remove('vps')
+        machine_types_non_vps = '|'.join(machine_types_non_vps)
+        machine_types = [machine_types_non_vps, 'vps']
     else:
         machine_types_str = '|'.join(machine_types_list)
         machine_types = [machine_types_str, ]
@@ -104,9 +106,9 @@ def lock_many(ctx, num, machine_type, user=None, description=None,
         )
         # Only query for os_type/os_version if non-vps and non-libcloud, since
         # in that case we just create them.
-        vm_types = downburst_types + teuthology.provision.cloud.get_types()
+        vm_types = ['vps'] + teuthology.provision.cloud.get_types()
         reimage_types = teuthology.provision.get_reimage_types()
-        if machine_type not in (vm_types + reimage_types):
+        if machine_type not in vm_types + reimage_types:
             if os_type:
                 data['os_type'] = os_type
             if os_version:
@@ -143,12 +145,7 @@ def lock_many(ctx, num, machine_type, user=None, description=None,
                 update_nodes(ok_machs)
                 return ok_machs
             elif reimage and machine_type in reimage_types:
-                try:
-                    return reimage_machines(ctx, machines, machine_type)
-                except Exception:
-                    log.exception('Reimaging error. Unlocking machines...')
-                    unlock_many(machines, user)
-                    continue
+                return reimage_machines(ctx, machines, machine_type)
             return machines
         elif response.status_code == 503:
             log.error('Insufficient nodes available to lock %d %s nodes.',
@@ -191,7 +188,7 @@ def unlock_safe(names: List[str], owner: str, run_name: str = "", job_id: str = 
 def unlock_one_safe(name: str, owner: str, run_name: str = "", job_id: str = "") -> bool:
     node_status = query.get_status(name)
     if node_status.get("locked", False) is False:
-        log.info(f"Refusing to unlock {name} since it is already unlocked")
+        log.warn(f"Refusing to unlock {name} since it is already unlocked")
         return False
     maybe_job = query.node_active_job(name, node_status)
     if not maybe_job:
@@ -205,9 +202,8 @@ def unlock_one_safe(name: str, owner: str, run_name: str = "", job_id: str = "")
             return False
         else:
             return unlock_one(name, owner, node_status["description"], node_status)
-    else:
-        log.info(f"Refusing to unlock {name} since it has an active job: {maybe_job}")
-        return False
+    log.warning(f"Refusing to unlock {name} since it has an active job: {maybe_job}")
+    return False
 
 
 def unlock_many(names, user):
@@ -393,6 +389,7 @@ def block_and_lock_machines(ctx, total_requested, machine_type, reimage=True, tr
 
     all_locked = dict()
     requested = total_requested
+    log.info("all_locked: {}, requested {}".format(all_locked, requested))
     while True:
         # get a candidate list of machines
         machines = query.list_locks(
@@ -402,6 +399,7 @@ def block_and_lock_machines(ctx, total_requested, machine_type, reimage=True, tr
             count=requested + reserved,
             tries=tries,
         )
+        log.info("machines: {}".format(machines))
         if machines is None:
             if ctx.block:
                 log.error('Error listing machines, trying again')
@@ -431,6 +429,7 @@ def block_and_lock_machines(ctx, total_requested, machine_type, reimage=True, tr
             newly_locked = lock_many(ctx, requested, machine_type,
                                      ctx.owner, ctx.archive, os_type,
                                      os_version, arch, reimage=reimage)
+            log.info("newly_locked {}".format(newly_locked))
         except Exception:
             # Lock failures should map to the 'dead' status instead of 'fail'
             if 'summary' in ctx:
@@ -509,9 +508,6 @@ def stop_node(name: str, status: Union[dict, None]):
         return
     elif status['machine_type'] in provision.pelagos.get_types():
         provision.pelagos.park_node(name)
-        return
-    elif status['machine_type'] in provision.maas.get_types():
-        provision.maas.MAAS(name).release()
         return
     elif remote_.is_container:
         remote_.run(

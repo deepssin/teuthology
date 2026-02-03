@@ -177,10 +177,12 @@ class Ansible(Task):
                 os.path.join(ctx.archive, "ansible.log")))
 
     def setup(self):
+        log.info("Setting up ansible")
         super(Ansible, self).setup()
         self.find_repo()
         self.get_playbook()
         self.get_inventory() or self.generate_inventory()
+        log.info("Set up inventory")
         if not hasattr(self, 'playbook_file'):
             self.generate_playbook()
 
@@ -249,8 +251,9 @@ class Ansible(Task):
         etc_ansible_hosts = '/etc/ansible/hosts'
         if self.inventory:
             self.inventory = os.path.expanduser(self.inventory)
-        elif os.path.exists(etc_ansible_hosts):
+        elif os.path.isfile(etc_ansible_hosts):
             self.inventory = etc_ansible_hosts
+        log.info("get_inventory returning %s", self.inventory)
         return self.inventory
 
     def generate_inventory(self):
@@ -267,6 +270,7 @@ class Ansible(Task):
         inventory.extend(hostnames + [''])
         hosts_str = '\n'.join(inventory)
         self.inventory = self._write_inventory_files(hosts_str)
+        log.info("Generating inventory %s", self.inventory)
         self.generated_inventory = True
 
     def _write_inventory_files(self, inventory, inv_suffix=''):
@@ -411,6 +415,7 @@ class Ansible(Task):
         user = list(self.cluster.remotes)[0].user
         extra_vars = dict(ansible_ssh_user=user)
         extra_vars.update(self.config.get('vars', dict()))
+        log.info("Extra vars config %s", self.config)
         args = [
             'ansible-playbook', '-v',
             "--extra-vars", "'%s'" % json.dumps(extra_vars),
@@ -473,6 +478,8 @@ class CephLab(Ansible):
 
     def __init__(self, ctx, config):
         config = config or dict()
+        if 'vars' not in config:
+            config['vars'] = ctx.config.get('vars', {})
         if 'playbook' not in config:
             config['playbook'] = 'cephlab.yml'
         if 'repo' not in config:

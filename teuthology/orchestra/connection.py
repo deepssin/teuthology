@@ -58,6 +58,7 @@ def connect(user_at_host, host_key=None, keep_alive=False, timeout=60,
     ssh = _SSHClient()
 
     if _create_key is None:
+        log.info("In _create_key")
         _create_key = create_key
 
     if host_key is None:
@@ -78,8 +79,10 @@ def connect(user_at_host, host_key=None, keep_alive=False, timeout=60,
         username=user,
         timeout=timeout
     )
-
-    key_filename = key_filename or config.ssh_key
+    log.info(f"key_filename: {key_filename}")
+    log.info(f"ssh_keyh: {config.ssh_key}")
+    log.info("config from orchestra", config)
+    key_filename = key_filename or config.ssh_key or config.key_filename
     ssh_config_path = config.ssh_config_path or "~/.ssh/config"
     ssh_config_path = os.path.expanduser(ssh_config_path)
     if os.path.exists(ssh_config_path):

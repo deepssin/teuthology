@@ -408,7 +408,7 @@ class Remote(RemoteShell):
             self.ssh.close()
         if not timeout:
             return self._reconnect(timeout=socket_timeout)
-        action = f"reconnect to {self.shortname}"
+        action = "reconnect to {self.shortname}"
         with safe_while(action=action, timeout=timeout, increment=3, _raise=False) as proceed:
             success = False
             while proceed():
@@ -481,46 +481,6 @@ class Remote(RemoteShell):
                 self._cidr = str(netaddr.IPNetwork(items[1]).cidr)
                 return
         raise RuntimeError("Could not determine interface/CIDR!")
-
-
-    def resolve_ip(self, name=None, ipv='4') -> str:
-        """
-        Resolve IP address of the remote host via remote host
-
-        Because remote object maybe behind bastion host we need
-        the remote host address resolvable from remote side.
-        So in order to the ip address we just call `host` remotely
-        and parse output like:
-            'smithi001.front.sepia.ceph.com has address 172.21.15.1\n'
-
-        :param name:    hostname to resolve, by defaults remote host itself.
-        :param ipv:     the IP version, 4 or 6, defaults to 4.
-
-        :raises:    :class:`Exception`: when the hostname cannot be resolved.
-        :raises:    :class:`ValueError`: when the ipv argument mismatch 4 or 6.
-
-        :returns:   str object, the ip addres of the remote host.
-        """
-        hostname = name or self.hostname
-        version = str(ipv)
-        if version in ['4', '6']:
-            remote_host_ip = self.sh(f'host -{ipv} {hostname}')
-        else:
-            raise ValueError(f'Unknown IP version {ipv}, expected 4 or 6')
-        # `host -4` or `host -6` may have multiline output: a host can have
-        # several address; thus try and find the first suitable
-        for info in remote_host_ip.split("\n"):
-            if version == '4' and 'has address' in info:
-                (host, ip) = info.strip().split(' has address ')
-                if hostname in host:
-                    return ip
-            elif version == '6' and 'has IPv6 address' in info:
-                (host, ip) = info.strip().split(' has IPv6 address ')
-                if hostname in host:
-                    return ip
-        else:
-            raise Exception(f'Cannot get IPv{ipv} address for the host "{hostname}" via remote "{self.hostname}"')
-
 
     @property
     def hostname(self):

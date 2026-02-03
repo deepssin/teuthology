@@ -7,8 +7,6 @@ RUN apt-get update && \
     apt-get install -y \
     build-essential \
     git \
-    jq \
-    curl \
     qemu-utils \
     python3-dev \
     libssl-dev \

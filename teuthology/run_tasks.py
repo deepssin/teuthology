@@ -94,10 +94,12 @@ def run_tasks(tasks, ctx):
         timer = Timer()
     stack = []
     taskname = ""
+    log.info("Tasks %s", tasks)
     try:
         for taskdict in tasks:
             try:
                 ((taskname, config),) = taskdict.items()
+                log.info("taskname %s, config %s ctx %s", taskname, config, ctx)
             except (ValueError, AttributeError):
                 raise RuntimeError('Invalid task definition: %s' % taskdict)
             log.info('Running task %s...', taskname)

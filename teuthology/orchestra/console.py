@@ -217,7 +217,7 @@ class PhysicalConsole(RemoteConsole):
                             pexpect.EOF,
                             pexpect.TIMEOUT
                         ],
-                        timeout=20
+                        timeout=1
                     )
                     self.log.debug(
                         f"check power output: {child.logfile_read.getvalue().strip()}"

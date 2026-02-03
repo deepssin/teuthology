@@ -13,3 +13,7 @@ overrides:
        mount_wait: 60
        mount_timeout: 120
 archive-on-error: true
+key_filename: /home/ubuntu/cephkey
+ssh_key: /home/ubuntu/cephkey
+vars:
+  ansible_ssh_private_key_file: /home/ubuntu/cephkey

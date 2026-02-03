@@ -36,13 +36,11 @@ DISTRO_CODENAME_MAP = {
     },
     "alma": {
         "8.10": "alma",
-        "9.7": "alma",
-        "10.1": "alma",
+        "9.5": "alma",
     },
     "rocky": {
         "8.10": "rocky",
-        "9.7": "rocky",
-        "10.1": "rocky",
+        "9.5": "rocky",
     },
     "centos": {
         "10": "stream",
@@ -70,8 +68,7 @@ DISTRO_CODENAME_MAP = {
         "15.3": "leap",
         "15.4": "leap",
         "15.5": "leap",
-        "15.6": "leap",
-        "16.0": "leap",
+        "42.2": "leap",
         "42.3": "leap",
     },
     "sle": {
@@ -84,8 +81,6 @@ DISTRO_CODENAME_MAP = {
         "15.3": "sle",
         "15.4": "sle",
         "15.5": "sle",
-        "15.6": "sle",
-        "15.7": "sle",
     },
 }
 
@@ -93,11 +88,11 @@ DEFAULT_OS_VERSION = dict(
     ubuntu="22.04",
     fedora="25",
     centos="9.stream",
-    opensuse="15.6",
+    opensuse="15.4",
     sle="15.2",
     rhel="8.6",
-    rocky="9.7",
-    alma="9.7",
+    rocky="9.5",
+    alma="9.5",
     debian='8.0'
 )
 
@@ -113,7 +108,7 @@ class OS(object):
     __slots__ = ['name', 'version', 'codename', 'package_type']
 
     _deb_distros = ('debian', 'ubuntu')
-    _rpm_distros = ('alma', 'rocky', 'fedora', 'rhel', 'centos', 'opensuse', 'sle')
+    _rpm_distros = ('fedora', 'rhel', 'centos', 'opensuse', 'sle')
 
     def __init__(self, name=None, version=None, codename=None):
         self.name = name

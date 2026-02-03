@@ -14,15 +14,6 @@ from teuthology.lock import query
 log = logging.getLogger(__name__)
 
 
-def get_types():
-    types = ['vps']
-    if 'downburst' in config and 'machine' in config.downburst:
-        machine = config.downburst.get('machine')
-        if isinstance(machine, list):
-            types = list(m.get('type') for m in machine)
-    return types
-
-
 def downburst_executable():
     """
     First check for downburst in the user's path.
@@ -195,32 +186,24 @@ class Downburst(object):
         os_version = self.os_version.lower()
 
         mac_address = self.status['mac_address']
-        machine = dict(
-            disk=os.environ.get('DOWNBURST_DISK_SIZE', '100G'),
-            ram=os.environ.get('DOWNBURST_RAM_SIZE', '3.8G'),
-            cpus=int(os.environ.get('DOWNBURST_CPUS', 1)),
-            volumes=dict(
-                count=int(os.environ.get('DOWNBURST_EXTRA_DISK_NUMBER', 4)),
-                size=os.environ.get('DOWNBURST_EXTRA_DISK_SIZE', '100G'),
-            ),
+        defaults = dict(
+            downburst=dict(
+                machine=dict(
+                    disk=os.environ.get('DOWNBURST_DISK_SIZE', '100G'),
+                    ram=os.environ.get('DOWNBURST_RAM_SIZE', '3.8G'),
+                    cpus=int(os.environ.get('DOWNBURST_CPUS', 1)),
+                    volumes=dict(
+                        count=int(os.environ.get('DOWNBURST_EXTRA_DISK_NUMBER', 4)),
+                        size=os.environ.get('DOWNBURST_EXTRA_DISK_SIZE', '100G'),
+                    ),
+                ),
+            )
         )
-        def belongs_machine_type(machine_config: dict, machine_type: str) -> bool:
-            if isinstance(machine_config, dict):
-                t = machine_config.get('type', None)
-                if isinstance(t, str):
-                    return machine_type == t
-                elif isinstance(t, list):
-                    return machine_type in t
-            return False
-        if isinstance(config.downburst, dict) and isinstance(config.downburst.get('machine'), list):
-            machine_type = self.status['machine_type']
-            machine_config = next((m for m in config.downburst.get('machine')
-                        if belongs_machine_type(m, machine_type)), None)
-            if machine_config is None:
-                raise RuntimeError(f"Cannot find config for machine type {machine_type}.")
-        elif isinstance(config.downburst, dict) and isinstance(config.downburst.get('machine'), dict):
-            machine_config = config.downburst.get('machine')
-        deep_merge(machine, machine_config)
+        downburst_config = defaults['downburst']
+        if config.downburst and isinstance(config.downburst, dict):
+            deep_merge(downburst_config, config.downburst)
+        log.debug('downburst_config: %s', downburst_config)
+        machine = downburst_config['machine']
         log.debug('Using machine config: %s', machine)
         file_info = {
             'disk-size': machine['disk'],
@@ -263,30 +246,18 @@ class Downburst(object):
             'git',
             'wget',
         ])
-        if os_type in ('centos', 'opensuse'):
-            user_info['packages'].extend([
-                'chrony',
-            ])
-        if os_type in ('ubuntu', 'debian'):
-            user_info['packages'].extend([
-                'ntp',
-            ])
-
         # On CentOS/RHEL/Fedora, write the correct mac address and
+        # install redhab-lsb-core for `lsb_release`
         if os_type in ['centos', 'rhel', 'fedora']:
             user_info['runcmd'].extend([
                 ['sed', '-ie', 's/HWADDR=".*"/HWADDR="%s"/' % mac_address,
                  '/etc/sysconfig/network-scripts/ifcfg-eth0'],
             ])
+            user_info['packages'].append('redhat-lsb-core')
         # On Ubuntu, starting with 16.04, and Fedora, starting with 24, we need
         # to install 'python' to get python2.7, which ansible needs
         if os_type in ('ubuntu', 'fedora'):
             user_info['packages'].append('python')
-        if os_type in ('centos'):
-            user_info['packages'].extend([
-                'python3-pip',
-                'bind-utils',
-            ])
         user_fd = tempfile.NamedTemporaryFile(delete=False, mode='wt')
         user_str = "#cloud-config\n" + yaml.safe_dump(user_info)
         user_fd.write(user_str)
@@ -311,54 +282,43 @@ class Downburst(object):
         self.remove_config()
 
 
-_known_downburst_distros = {
-    'rhel_minimal': ['6.4', '6.5'],
-    'centos': ['9.stream', '10.stream'],
-    'centos_minimal': ['6.4', '6.5'],
-    'debian': ['6.0', '7.0', '7.9', '8.0'],
-    'fedora': ['41', '42'],
-    'opensuse': ['1.0(tumbleweed)',
-                 '15.5(leap)', '15.6(leap)',
-                 '16.0(leap)',
-        ],
-    'sles': ['12-sp3', '15-sp1', '15-sp2'],
-    'alma': ['10.1', '8.10', '9.7'],
-    'rocky': ['10.1', '8.10', '9.7'],
-    'ubuntu': ['20.04(focal)', '20.10(groovy)',
-               '21.04(hirsute)', '21.10(impish)',
-               '22.04(jammy)', '22.10(kinetic)',
-               '23.04(lunar)', '23.10(mantic)',
-               '24.04(noble)', '24.10(oracular)',
-               '25.04(plucky)',
-        ],
-}
-
 def get_distro_from_downburst():
     """
     Return a table of valid distros.
 
     If downburst is in path use it.  If either downburst is unavailable,
     or if downburst is unable to produce a json list, then use a default
-    table or a table from previous successful call.
+    table.
     """
-    # because sometimes downburst fails to complete list-json
-    # due to temporary issues with vendor site accessibility
-    # we cache known downburst distros from previous call
-    # to be reused in such cases of outage
-    global _known_downburst_distros
+    default_table = {'rhel_minimal': ['6.4', '6.5'],
+                     'fedora': ['17', '18', '19', '20', '22'],
+                     'centos': ['6.3', '6.4', '6.5', '7.0',
+				 '7.2', '7.4', '8.2'],
+                     'centos_minimal': ['6.4', '6.5'],
+                     'ubuntu': ['8.04(hardy)', '9.10(karmic)',
+                                 '10.04(lucid)', '10.10(maverick)',
+                                 '11.04(natty)', '11.10(oneiric)',
+                                 '12.04(precise)', '12.10(quantal)',
+                                 '13.04(raring)', '13.10(saucy)',
+                                 '14.04(trusty)', 'utopic(utopic)',
+                                 '16.04(xenial)', '18.04(bionic)',
+                                 '20.04(focal)'],
+                     'sles': ['12-sp3', '15-sp1', '15-sp2'],
+                     'opensuse': ['12.3', '15.1', '15.2'],
+                     'debian': ['6.0', '7.0', '8.0']}
     executable_cmd = downburst_executable()
     environment_dict = downburst_environment()
     if not executable_cmd:
         log.warning("Downburst not found!")
         log.info('Using default values for supported os_type/os_version')
-        return _known_downburst_distros
+        return default_table
     try:
         log.debug(executable_cmd)
         output = subprocess.check_output([executable_cmd, 'list-json'],
                                                         env=environment_dict)
-        _known_downburst_distros = json.loads(output)
-        return _known_downburst_distros
+        downburst_data = json.loads(output)
+        return downburst_data
     except (subprocess.CalledProcessError, OSError):
         log.exception("Error calling downburst!")
-        log.info('Using default values for supported os_type/os_version or values from previous call...')
-        return _known_downburst_distros
+        log.info('Using default values for supported os_type/os_version')
+        return default_table
