@@ -53,9 +53,13 @@ run_smoke_for_branch() {
     return 1
   fi
   
-  log "Using shaman build id for branch $branch: $shaman_id"
+  log "Using shaman build id (ceph sha) for branch $branch: $shaman_id"
   rm -f "$tmp_err"
-  
+
+  # Use same SHA for suite so QA tests match the installed Ceph build (avoids
+  # e.g. ImportError when suite expects symbols not in the build's Python bindings)
+  local suite_sha1="$shaman_id"
+
   # Upload shaman_id to remote server
   sshpass -p "admin" ssh -o StrictHostKeyChecking=no cloud-user@10.0.196.233 \
     "sudo mkdir -p /data/scheduler/cron && echo '${shaman_id}' | sudo tee /data/scheduler/cron/${branch}-$(date "+%Y-%m-%d") > /dev/null" 2>&1 | tee -a "$LOG_FILE"
@@ -75,12 +79,13 @@ run_smoke_for_branch() {
   local suite="smoke"
   local seed=8446
   
-  log "Starting smoke suite for branch $branch with seed=$seed"
+  log "Starting smoke suite for branch $branch with seed=$seed (ceph sha=$shaman_id, suite sha=$suite_sha1)"
   
   # Capture timestamp
   local timestamp=$(date "+%Y-%m-%d_%H:%M:%S")
   
-  # Build and run command
+  # Build and run command: use same SHA for both --sha1 (Ceph build) and --suite-sha1 (QA)
+  # to avoid build/suite mismatch (e.g. RBD_LOCK_MODE_EXCLUSIVE_TRANSIENT).
   local cmd="teuthology-suite \
       --suite \"$suite\" \
       --machine-type openstack \
@@ -90,6 +95,7 @@ run_smoke_for_branch() {
       --force-priority \
       --seed $seed \
       --sha1 $shaman_id \
+      --suite-sha1 $suite_sha1 \
       $OVERRIDE_YAML"
   
   log "Running command: $cmd"
@@ -118,7 +124,12 @@ run_smoke_for_branch() {
   fi
   
   log "Using run name: $run_name"
-  
+
+  # Record run name for rerun-failed-smoke.sh (rerun fail/dead jobs once)
+  local runs_file="$LOG_DIR/smoke-runs-$(date '+%Y-%m-%d')"
+  echo "$run_name" >> "$runs_file"
+  log "Recorded run name to $runs_file"
+
   # Wait for run to be registered
   log "Waiting 10 seconds for run to be registered on server..."
   sleep 10
@@ -218,6 +229,22 @@ else
     else
         log "✗ Smoke suite for 'main' branch had errors"
     fi
+fi
+log ""
+
+# Check for fail/dead jobs and rerun them once (uses logs/smoke-runs-YYYY-MM-DD written above)
+log "=========================================="
+log "Checking for fail/dead jobs and rerunning once if needed..."
+log "=========================================="
+runs_file="$LOG_DIR/smoke-runs-$(date '+%Y-%m-%d')"
+if [[ -f "$runs_file" ]]; then
+  if "$SCRIPT_DIR/rerun-failed-smoke.sh" >> "$LOG_FILE" 2>&1; then
+    log "✓ Rerun check completed"
+  else
+    log "✗ Rerun check had errors (see log)"
+  fi
+else
+  log "No smoke-runs file found ($runs_file), skipping rerun check"
 fi
 log ""
 
